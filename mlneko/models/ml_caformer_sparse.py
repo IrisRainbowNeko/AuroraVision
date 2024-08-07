@@ -4,13 +4,15 @@ from timm.models import create_model
 from torch import nn
 from rainbowneko.models.layers import GroupLinear
 import math
+from torch.utils.checkpoint import checkpoint
 
 from .ms_decoder import MSDecoder, MSDecoderLayer
 from .position_encoding import build_position_encoding
 from .layers import RMSNorm
 
 class MLFormerSpares(nn.Module):
-    def __init__(self, encoder, decoder: MSDecoder, num_queries=50, d_model=512, num_classes=1000, scale_skip=0, T=4.):
+    def __init__(self, encoder, decoder: MSDecoder, num_queries=50, d_model=512, num_classes=1000, scale_skip=0, T=4.,
+                 grad_checkpointing=True):
         super().__init__()
         self.encoder = encoder
         self.decoder = decoder
@@ -19,9 +21,9 @@ class MLFormerSpares(nn.Module):
         self.cls_head = GroupLinear(d_model, math.ceil(num_classes/num_queries), group=num_queries)
 
         self.feats_trans = nn.ModuleList([nn.Sequential(
-            RMSNorm(dim),
-            nn.Linear(dim, d_model),
-        ) for dim in self.encoder.scale_dims[scale_skip:]])
+            RMSNorm(info['num_chs']),
+            nn.Linear(info['num_chs'], d_model),
+        ) for info in self.encoder.feature_info[scale_skip:]])
         self.pos_encoder = build_position_encoding('sine', d_model)
         self.query_embed = nn.Embedding(num_queries, d_model)
 
@@ -30,12 +32,17 @@ class MLFormerSpares(nn.Module):
         self.d_model = d_model
         self.scale_skip = scale_skip
         self.T = T
+        self.grad_checkpointing = grad_checkpointing
 
     def encode(self, x):
+        x = self.encoder.stem(x)
         feat_list = []
-        for i in range(self.encoder.num_stage):
-            x = self.encoder.downsample_layers[i](x)
-            x = self.encoder.stages[i](x)
+        for i, stage in enumerate(self.encoder.stages):
+            if self.grad_checkpointing and not torch.jit.is_scripting():
+                x = checkpoint(self.stages, x)
+            else:
+                x = self.stages(x)
+
             if i >= self.scale_skip:
                 feat_list.append(x)
         return feat_list
