@@ -28,6 +28,8 @@ num_classes = 6554
 def make_cfg():
     dict(
         _base_=make_base(train_base, tuning_base)+[],
+        mixed_precision='fp16',
+        allow_tf32=True,
 
         model_part=CfgWDModelParser([
             dict(
