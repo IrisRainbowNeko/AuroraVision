@@ -67,7 +67,7 @@ class AsymmetricLoss(nn.Module):
 
 class AsymmetricKLLoss(nn.Module):
     def __init__(self, gamma_neg=4, gamma_pos=1, w1=0.5, weight_file=None, clip=0.05, eps=1e-6, focal_no_grad=False):
-        super(AsymmetricLoss, self).__init__()
+        super().__init__()
 
         self.gamma_neg = gamma_neg
         self.gamma_pos = gamma_pos
@@ -101,7 +101,7 @@ class AsymmetricKLLoss(nn.Module):
 
         # Basic CE calculation
         los_pos = F.kl_div(xs_pos.clamp(min=self.eps).log(), y)
-        los_neg = F.kl_div(xs_neg.clamp(min=self.eps), 1-y)
+        los_neg = F.kl_div(xs_neg.clamp(min=self.eps).log(), 1-y)
         loss = los_pos + los_neg
 
         # Asymmetric Focusing
