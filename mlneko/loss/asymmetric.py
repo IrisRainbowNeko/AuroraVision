@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 
 
@@ -57,12 +58,73 @@ class AsymmetricLoss(nn.Module):
             loss *= one_sided_w
 
         if self.cls_weight is not None:
+            self.cls_weight = self.cls_weight.to(x.device)
             cls_weight_pos = y*self.cls_weight.log()
             cls_weight_neg = (1-y)*(1/self.cls_weight).log()
             loss = loss * (cls_weight_pos+cls_weight_neg).exp()
 
         return -loss.sum()/B
 
+class AsymmetricKLLoss(nn.Module):
+    def __init__(self, gamma_neg=4, gamma_pos=1, w1=0.5, weight_file=None, clip=0.05, eps=1e-6, focal_no_grad=False):
+        super(AsymmetricLoss, self).__init__()
+
+        self.gamma_neg = gamma_neg
+        self.gamma_pos = gamma_pos
+        self.w1 = w1
+        self.clip = clip
+        self.focal_no_grad = focal_no_grad
+        self.eps = eps
+
+        if weight_file:
+            self.cls_weight = torch.tensor(np.load(weight_file))
+        else:
+            self.cls_weight = None
+
+    def forward(self, x, y):
+        """"
+        Parameters
+        ----------
+        x: input logits
+        y: targets (multi-label binarized vector)
+        """
+
+        B = x.shape[0]
+        # Calculating Probabilities
+        x_sigmoid = torch.sigmoid(x)
+        xs_pos = x_sigmoid
+        xs_neg = 1 - x_sigmoid
+
+        # Asymmetric Clipping
+        if self.clip is not None and self.clip > 0:
+            xs_neg = (xs_neg + self.clip).clamp(max=1)
+
+        # Basic CE calculation
+        los_pos = F.kl_div(xs_pos.clamp(min=self.eps).log(), y)
+        los_neg = F.kl_div(xs_neg.clamp(min=self.eps), 1-y)
+        loss = los_pos + los_neg
+
+        # Asymmetric Focusing
+        if self.gamma_neg > 0 or self.gamma_pos > 0:
+            if self.focal_no_grad:
+                torch.set_grad_enabled(False)
+            pt0 = xs_pos * y
+            pt1 = xs_neg * (1 - y)  # pt = p if t > 0 else 1-p
+            pt = pt0 + pt1
+            one_sided_gamma = self.gamma_pos * y + self.gamma_neg * (1 - y)
+            one_sided_w = torch.pow(1 - pt, one_sided_gamma)
+            one_sided_w = one_sided_w + self.w1
+            if self.focal_no_grad:
+                torch.set_grad_enabled(True)
+            loss *= one_sided_w
+
+        if self.cls_weight is not None:
+            self.cls_weight = self.cls_weight.to(x.device)
+            cls_weight_pos = y*self.cls_weight.log()
+            cls_weight_neg = (1-y)*(1/self.cls_weight).log()
+            loss = loss * (cls_weight_pos+cls_weight_neg).exp()
+
+        return -loss.sum()/B
 
 class AsymmetricLossOptimized(nn.Module):
     ''' Notice - optimized version, minimizes memory allocation and gpu uploading,

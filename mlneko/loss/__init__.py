@@ -1,2 +1,2 @@
-from .asymmetric import AsymmetricLoss
+from .asymmetric import AsymmetricLoss, AsymmetricKLLoss
 from .entropy import EntropyLoss

@@ -19,7 +19,7 @@ from rainbowneko.parser import make_base, CfgWDModelParser
 from rainbowneko.train.loggers import CLILogger, TBLogger
 
 from mlneko.models.ml_caformer_sparse import mlformer_L
-from mlneko.loss import AsymmetricLoss, EntropyLoss
+from mlneko.loss import AsymmetricKLLoss, EntropyLoss
 from mlneko.data import LmdbDanbooruSource
 
 from cfgs.py.train import train_base, tuning_base
@@ -57,7 +57,7 @@ def make_cfg():
             save_step=10000,
             gradient_accumulation_steps=4,
 
-            loss=LossContainer(_partial_=True, loss=AsymmetricLoss(
+            loss=LossContainer(_partial_=True, loss=AsymmetricKLLoss(
                 weight_file='/dataset/dzy/danbooru_2023/tags_danbooru_weight.npy',
                 focal_no_grad=True
             )),
