@@ -1,16 +1,23 @@
 import torch
 import torch.nn as nn
+import numpy as np
 
 
 class AsymmetricLoss(nn.Module):
-    def __init__(self, gamma_neg=4, gamma_pos=1, clip=0.05, eps=1e-6, focal_no_grad=False):
+    def __init__(self, gamma_neg=4, gamma_pos=1, w1=0.5, weight_file=None, clip=0.05, eps=1e-6, focal_no_grad=False):
         super(AsymmetricLoss, self).__init__()
 
         self.gamma_neg = gamma_neg
         self.gamma_pos = gamma_pos
+        self.w1 = w1
         self.clip = clip
         self.focal_no_grad = focal_no_grad
         self.eps = eps
+
+        if weight_file:
+            self.cls_weight = torch.tensor(np.load(weight_file))
+        else:
+            self.cls_weight = None
 
     def forward(self, x, y):
         """"
@@ -44,9 +51,13 @@ class AsymmetricLoss(nn.Module):
             pt = pt0 + pt1
             one_sided_gamma = self.gamma_pos * y + self.gamma_neg * (1 - y)
             one_sided_w = torch.pow(1 - pt, one_sided_gamma)
+            one_sided_w = one_sided_w + self.w1
             if self.focal_no_grad:
                 torch.set_grad_enabled(True)
             loss *= one_sided_w
+
+        if self.cls_weight is not None:
+            loss = loss * self.cls_weight
 
         return -loss.sum()/B
 

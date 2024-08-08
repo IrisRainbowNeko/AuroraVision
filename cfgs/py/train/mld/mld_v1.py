@@ -35,7 +35,7 @@ def make_cfg():
     dict(
         _base_=make_base(train_base, tuning_base)+[],
 
-        exp_dir=f'exps/mld_v1',
+        exp_dir=f'exps/mld_v1.1',
         mixed_precision='fp16',
         allow_tf32=True,
 
@@ -57,7 +57,10 @@ def make_cfg():
             save_step=10000,
             gradient_accumulation_steps=4,
 
-            loss=LossContainer(_partial_=True, loss=AsymmetricLoss()),
+            loss=LossContainer(_partial_=True, loss=AsymmetricLoss(
+                weight_file='/dataset/dzy/danbooru_2023/tags_danbooru_weight.npy',
+                focal_no_grad=True
+            )),
             # loss=LossGroup(partial_=True, loss_list=[
             #     LossContainer(loss=AsymmetricLoss()),
             #     LossContainer(loss=EntropyLoss(), weight=0.1),
@@ -68,7 +71,7 @@ def make_cfg():
             scale_lr=False,
             scheduler=dict(
                 name='cosine',
-                num_warmup_steps=1000,
+                num_warmup_steps=5000,
             ),
             metrics=MetricGroup(metric_dict=dict(
                 kld=MetricContainer(KLDivergenceSigmoid()),
