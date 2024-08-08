@@ -57,9 +57,9 @@ class AsymmetricLoss(nn.Module):
             loss *= one_sided_w
 
         if self.cls_weight is not None:
-            cls_weight_pos = y*self.cls_weight
-            cls_weight_neg = (1-y)*(1/self.cls_weight)
-            loss = loss * (cls_weight_pos+cls_weight_neg)
+            cls_weight_pos = y*self.cls_weight.log()
+            cls_weight_neg = (1-y)*(1/self.cls_weight).log()
+            loss = loss * (cls_weight_pos+cls_weight_neg).exp()
 
         return -loss.sum()/B
 
