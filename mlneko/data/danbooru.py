@@ -10,10 +10,10 @@ import csv
 
 class LmdbDanbooruSource(ImageLabelSource):
     def __init__(self, img_root, label_file, num_classes=6554, image_transforms=None, bg_color=(255, 255, 255), repeat=1, **kwargs):
-        super(ImageLabelSource, self).__init__(img_root, label_file, image_transforms=image_transforms, bg_color=bg_color,
+        super(LmdbDanbooruSource, self).__init__(img_root, label_file, image_transforms=image_transforms, bg_color=bg_color,
                                                repeat=repeat)
 
-        self.env = lmdb.open('images_2023', readonly=True)
+        self.env = lmdb.open(img_root, readonly=True, max_readers=256)
         self.num_classes = num_classes
 
     def load_image(self, img_id: int) -> Dict[str, Any]:
@@ -22,6 +22,7 @@ class LmdbDanbooruSource(ImageLabelSource):
             specific_key = struct.pack('q', img_id)
             value = txn.get(specific_key)
             buffer = io.BytesIO(value)
+        txn.abort()
 
         # 使用 Image.open() 从 BytesIO 对象中读取图像
         image = Image.open(buffer)
@@ -38,6 +39,7 @@ class LmdbDanbooruSource(ImageLabelSource):
     def _load_label_data(self, label_file: str):
         label_dict = {}
         self.size_dict = {}
+        zero_count=0
         with open(label_file, 'r', encoding='utf-8') as f:
             reader = csv.reader(f)
             for i, row in enumerate(reader):
@@ -45,8 +47,12 @@ class LmdbDanbooruSource(ImageLabelSource):
                     continue
 
                 img_id, tags, w, h = row
-                label_dict[img_id] = [int(x) for x in tags.split(' ')]
-                self.size_dict[img_id] = (int(w), int(h))
+                if len(tags)==0:
+                    zero_count+=1
+                else:
+                    label_dict[int(img_id)] = [int(x) for x in tags.split(' ')]
+                    self.size_dict[int(img_id)] = (int(w), int(h))
+        print('zero', zero_count)
         return label_dict
 
     def get_image_size(self, img_id: int) -> Tuple[int, int]:

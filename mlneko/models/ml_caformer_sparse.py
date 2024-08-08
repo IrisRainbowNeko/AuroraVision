@@ -39,9 +39,9 @@ class MLFormerSpares(nn.Module):
         feat_list = []
         for i, stage in enumerate(self.encoder.stages):
             if self.grad_checkpointing and not torch.jit.is_scripting():
-                x = checkpoint(self.stages, x)
+                x = checkpoint(stage, x)
             else:
-                x = self.stages(x)
+                x = stage(x)
 
             if i >= self.scale_skip:
                 feat_list.append(x)
@@ -49,8 +49,8 @@ class MLFormerSpares(nn.Module):
 
     def decode(self, feat_list):
         q = repeat(self.query_embed.weight, 'q c -> b q c', b=feat_list[0].shape[0])
-        pos_emb = [rearrange(self.pos_encoder(x), 'b h w c -> b (h w) c') for x in feat_list]
-        feat_list = [trans(rearrange(x, 'b h w c -> b (h w) c')) for x, trans in zip(feat_list, self.feats_trans)]
+        pos_emb = [self.pos_encoder(rearrange(x, 'b c h w -> b h w c')).flatten(1,2) for x in feat_list]
+        feat_list = [trans(rearrange(x, 'b c h w -> b (h w) c')) for x, trans in zip(feat_list, self.feats_trans)]
 
         out = self.decoder(q, feat_list, pos=pos_emb)
         return out
@@ -60,7 +60,9 @@ class MLFormerSpares(nn.Module):
         pred = self.decode(feat_list)  # [B, num_queries, C]
 
         pred = self.final_norm(pred)
-        pred = self.cls_head(pred.transpose(0,1))  # [num_queries, B, ceil(num_classes/num_queries)]
+        pred = rearrange(pred, 'b (n q) cg -> n q b cg', q=self.num_queries)
+        pred = (pred * torch.softmax(pred * self.T, dim=0)).sum(dim=0) # [num_queries, B, ceil(num_classes/num_queries)]
+        pred = self.cls_head(pred)  # [num_queries, B, ceil(num_classes/num_queries)]
         pred = pred.transpose(0,1).flatten(1,2)[:, :self.num_classes] # [B, num_classes]
         return pred
 
@@ -68,6 +70,7 @@ class MLFormerSpares(nn.Module):
 def build_mlformer(model_name, d_model=512, pretrained_encoder=True, dec_head_dim=32, dec_layers=6, encoder_ckpt=None,
                    num_queries=50, num_classes=1000, scale_skip=1, T=4.):
     encoder = create_model(model_name, pretrained=pretrained_encoder)
+    del encoder.head
     dec_layer = lambda : MSDecoderLayer(d_model, head_dim=dec_head_dim)
     decoder = MSDecoder(dec_layer, dec_layers, norm=RMSNorm(d_model))
 
@@ -80,13 +83,13 @@ def build_mlformer(model_name, d_model=512, pretrained_encoder=True, dec_head_di
     return model
 
 def mlformer_H(num_classes, scale_skip=2, T=4.):
-    return build_mlformer('caformer_b36', d_model=768, num_queries=60,
+    return build_mlformer('caformer_b36.sail_in22k_ft_in1k_384', d_model=640, num_queries=60, dec_layers=5,
                           scale_skip=scale_skip, num_classes=num_classes, T=T)
 
 def mlformer_L(num_classes, scale_skip=2, T=4.):
-    return build_mlformer('caformer_b36', d_model=640, num_queries=60, dec_layers=3,
+    return build_mlformer('caformer_b36.sail_in22k_ft_in1k_384', d_model=640, num_queries=60, dec_layers=3,
                           scale_skip=scale_skip, num_classes=num_classes, T=T)
 
 def mlformer_M(num_classes, scale_skip=2, T=4.):
-    return build_mlformer('caformer_m36', d_model=512, num_queries=60, dec_layers=5,
+    return build_mlformer('caformer_m36.sail_in22k_ft_in1k_384', d_model=512, num_queries=60, dec_layers=5,
                           scale_skip=scale_skip, num_classes=num_classes, T=T)

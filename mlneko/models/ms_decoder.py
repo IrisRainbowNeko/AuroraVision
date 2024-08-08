@@ -84,7 +84,7 @@ def _get_clones(module, N):
 
 class MSDecoder(nn.Module):
 
-    def __init__(self, layer_builder, num_layers, norm=None, grad_checkpointing=True):
+    def __init__(self, layer_builder, num_layers, norm=None, grad_checkpointing=False):
         super().__init__()
         self.layers = nn.ModuleList([layer_builder() for _ in range(num_layers)])
         self.num_layers = num_layers
@@ -100,8 +100,8 @@ class MSDecoder(nn.Module):
 
         for layer in self.layers:
             if self.grad_checkpointing and not torch.jit.is_scripting():
-                output = checkpoint(layer, output, memory, tgt_mask=tgt_mask, memory_mask=memory_mask,
-                           pos=pos, query_pos=query_pos)
+                output = checkpoint(layer, output, memory, tgt_mask, memory_mask,
+                           pos, query_pos)
             else:
                 output = layer(output, memory, tgt_mask=tgt_mask, memory_mask=memory_mask,
                            pos=pos, query_pos=query_pos)
