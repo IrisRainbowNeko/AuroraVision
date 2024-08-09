@@ -1,10 +1,10 @@
 import csv
 import numpy as np
 
-count_path = r'E:\dataset\tagger\tags.csv'
-tag_map_path = r'E:\dataset\tagger\tags_danbooru_map.csv'
+count_path = r'E:\dataset\tagger\tags_count_danbooru_2023.csv'
+tag_map_path = r'E:\dataset\tagger\tags_danbooru_map_v2.csv'
 
-out_path = r'E:\dataset\tagger\tags_danbooru_weight.npy'
+out_path = r'E:\dataset\tagger\tags_danbooru_weight_v2.npy'
 
 tag2id = {}
 

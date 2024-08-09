@@ -210,7 +210,7 @@ def filter_3dbooru(path=r'E:\dataset\tagger\tags_3dbooru.csv'):
         #tags = [row[0].replace('_', ' ') for row in reader][1:2500]
     return metadatas, tags, raw_tags
 
-def filter_danbooru(path=r'E:\dataset\tagger\tags_danbooru.csv'):
+def filter_danbooru(path=r'E:\dataset\tagger\selected_tags.csv'):
     metadatas = []
     tags = []
     raw_tags = []
@@ -220,7 +220,8 @@ def filter_danbooru(path=r'E:\dataset\tagger\tags_danbooru.csv'):
             if i == 0:
                 continue
 
-            tag = row[0]
+            #tag = row[0]
+            tag = row[1]
             if tag in exclude_tags:
                 continue
 
@@ -236,11 +237,11 @@ print('len', len(content_tags), len(raw_tags))
 print(','.join(content_tags))
 print(','.join(raw_tags))
 
-with open(r'E:\dataset\tagger\tags_danbooru_prune.csv', 'w', encoding='utf-8') as f:
+with open(r'E:\dataset\tagger\tags_danbooru_prune_v2.csv', 'w', encoding='utf-8') as f:
     f.write('\n'.join(list(dict.fromkeys(content_tags))))
 
 tags_mapper = [f'{raw_tag} -> {tag}' for tag, raw_tag in zip(content_tags, raw_tags)]
 
 # 输出筛选后的标签
-with open(r'E:\dataset\tagger\tags_danbooru_map.csv', 'w', encoding='utf-8') as f:
+with open(r'E:\dataset\tagger\tags_danbooru_map_v2.csv', 'w', encoding='utf-8') as f:
     f.write('\n'.join(tags_mapper))

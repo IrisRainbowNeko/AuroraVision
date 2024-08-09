@@ -7,7 +7,7 @@ import csv
 def process_text(text):
     # 将文本转换为小写
     text = text.lower()
-    words = text.split(' ')
+    words = text.split(',')
     return Counter(words)
 
 

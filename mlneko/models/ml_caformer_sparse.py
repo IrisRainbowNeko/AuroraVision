@@ -5,20 +5,29 @@ from torch import nn
 from rainbowneko.models.layers import GroupLinear
 import math
 from torch.utils.checkpoint import checkpoint
+from typing import Union, List
 
 from .ms_decoder import MSDecoder, MSDecoderLayer
 from .position_encoding import build_position_encoding
 from .layers import RMSNorm
 
 class MLFormerSpares(nn.Module):
-    def __init__(self, encoder, decoder: MSDecoder, num_queries=50, d_model=512, num_classes=1000, scale_skip=0, T=4.,
-                 grad_checkpointing=True):
+    def __init__(self, encoder, decoder: MSDecoder, num_queries: int=200, d_model: int=512, ex_tokens:int=0,
+                 num_classes: Union[int, List[int]]=1000, scale_skip: int=0, T: float=4., grad_checkpointing=True):
         super().__init__()
         self.encoder = encoder
         self.decoder = decoder
 
         self.final_norm = RMSNorm(d_model)
-        self.cls_head = GroupLinear(d_model, math.ceil(num_classes/num_queries), group=num_queries)
+
+        # recompute num_queries for separate queries
+        if isinstance(num_classes, int):
+            num_classes = [num_classes]
+        pre_cls_num = math.ceil(sum(num_classes)/num_queries)
+        self.part_num_queries = [0]+[math.ceil(nc/pre_cls_num) for nc in num_classes]
+        num_queries = sum(self.part_num_queries) + ex_tokens
+
+        self.cls_head = GroupLinear(d_model, pre_cls_num, group=num_queries)
 
         self.feats_trans = nn.ModuleList([nn.Sequential(
             RMSNorm(info['num_chs']),
@@ -62,8 +71,13 @@ class MLFormerSpares(nn.Module):
         pred = self.final_norm(pred)
         pred = rearrange(pred, 'b (n q) cg -> n q b cg', q=self.num_queries)
         pred = (pred * torch.softmax(pred * self.T, dim=0)).sum(dim=0) # [num_queries, B, ceil(num_classes/num_queries)]
-        pred = self.cls_head(pred)  # [num_queries, B, ceil(num_classes/num_queries)]
-        pred = pred.transpose(0,1).flatten(1,2)[:, :self.num_classes] # [B, num_classes]
+        pred = self.cls_head(pred)  # [num_queries, B, pre_cls_num]
+        pred = pred.transpose(0,1)  # [B, num_queries, pre_cls_num]
+        if len(self.num_classes)==1:
+            pred = pred.flatten(1, 2)[:, :self.num_classes[0]]  # [B, num_classes]
+        else:
+            pred = torch.cat([pred[:, self.part_num_queries[i]:self.part_num_queries[i+1], :].flatten(1,2)[:self.num_classes[i]]
+                for i in range(len(self.part_num_queries)-1)], dim=-1)
         pred = pred.sigmoid()
         return pred
 
@@ -83,14 +97,14 @@ def build_mlformer(model_name, d_model=512, pretrained_encoder=True, dec_head_di
 
     return model
 
-def mlformer_H(num_classes, scale_skip=2, T=4.):
-    return build_mlformer('caformer_b36.sail_in22k_ft_in1k_384', d_model=640, num_queries=60, dec_layers=5,
+def mlformer_H(num_classes, scale_skip=2, num_queries=60, T=4.):
+    return build_mlformer('caformer_b36.sail_in22k_ft_in1k_384', d_model=640, num_queries=num_queries, dec_layers=5,
                           scale_skip=scale_skip, num_classes=num_classes, T=T)
 
-def mlformer_L(num_classes, scale_skip=2, T=4.):
-    return build_mlformer('caformer_b36.sail_in22k_ft_in1k_384', d_model=640, num_queries=60, dec_layers=3,
+def mlformer_L(num_classes, scale_skip=2, num_queries=60, T=4.):
+    return build_mlformer('caformer_b36.sail_in22k_ft_in1k_384', d_model=640, num_queries=num_queries, dec_layers=3,
                           scale_skip=scale_skip, num_classes=num_classes, T=T)
 
-def mlformer_M(num_classes, scale_skip=2, T=4.):
-    return build_mlformer('caformer_m36.sail_in22k_ft_in1k_384', d_model=512, num_queries=60, dec_layers=5,
+def mlformer_M(num_classes, scale_skip=2, num_queries=60, T=4.):
+    return build_mlformer('caformer_m36.sail_in22k_ft_in1k_384', d_model=512, num_queries=num_queries, dec_layers=5,
                           scale_skip=scale_skip, num_classes=num_classes, T=T)
