@@ -30,7 +30,8 @@ class AsymmetricLoss(nn.Module):
 
         B = x.shape[0]
         # Calculating Probabilities
-        x_sigmoid = torch.sigmoid(x)
+        #x_sigmoid = torch.sigmoid(x)
+        x_sigmoid = x
         xs_pos = x_sigmoid
         xs_neg = 1 - x_sigmoid
 
@@ -91,7 +92,8 @@ class AsymmetricKLLoss(nn.Module):
 
         B = x.shape[0]
         # Calculating Probabilities
-        x_sigmoid = torch.sigmoid(x)
+        #x_sigmoid = torch.sigmoid(x)
+        x_sigmoid = x
         xs_pos = x_sigmoid
         xs_neg = 1 - x_sigmoid
 
@@ -100,8 +102,8 @@ class AsymmetricKLLoss(nn.Module):
             xs_neg = (xs_neg + self.clip).clamp(max=1)
 
         # Basic CE calculation
-        los_pos = F.kl_div(xs_pos.clamp(min=self.eps).log(), y)
-        los_neg = F.kl_div(xs_neg.clamp(min=self.eps).log(), 1-y)
+        los_pos = F.kl_div(xs_pos.clamp(min=self.eps).log(), y, reduction = "none")
+        los_neg = F.kl_div(xs_neg.clamp(min=self.eps).log(), 1-y, reduction = "none")
         loss = los_pos + los_neg
 
         # Asymmetric Focusing
@@ -124,7 +126,7 @@ class AsymmetricKLLoss(nn.Module):
             cls_weight_neg = (1-y)*(1/self.cls_weight).log()
             loss = loss * (cls_weight_pos+cls_weight_neg).exp()
 
-        return -loss.sum()/B
+        return loss.sum()/B
 
 class AsymmetricLossOptimized(nn.Module):
     ''' Notice - optimized version, minimizes memory allocation and gpu uploading,

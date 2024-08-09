@@ -64,6 +64,7 @@ class MLFormerSpares(nn.Module):
         pred = (pred * torch.softmax(pred * self.T, dim=0)).sum(dim=0) # [num_queries, B, ceil(num_classes/num_queries)]
         pred = self.cls_head(pred)  # [num_queries, B, ceil(num_classes/num_queries)]
         pred = pred.transpose(0,1).flatten(1,2)[:, :self.num_classes] # [B, num_classes]
+        pred = pred.sigmoid()
         return pred
 
 

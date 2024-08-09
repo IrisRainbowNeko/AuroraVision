@@ -27,15 +27,11 @@ from timm.models.metaformer import caformer_b36
 
 num_classes = 6554
 
-class KLDivergenceSigmoid(KLDivergence):
-    def forward(self, p, q):
-        return super().forward(p.sigmoid(), q.sigmoid())
-
 def make_cfg():
     dict(
         _base_=make_base(train_base, tuning_base)+[],
 
-        exp_dir=f'exps/mld_v1.1',
+        exp_dir=f'exps/mld_v1.1-2',
         mixed_precision='fp16',
         allow_tf32=True,
 
@@ -66,6 +62,11 @@ def make_cfg():
             #     LossContainer(loss=EntropyLoss(), weight=0.1),
             # ]),
 
+            resume=dict(
+                ckpt_path=['exps/mld_v1.1/ckpts/mld-L_danbooru-50000.ckpt'],
+                start_step=0,
+            ),
+
             optimizer=torch.optim.AdamW(_partial_=True, weight_decay=0),
 
             scale_lr=False,
@@ -74,7 +75,7 @@ def make_cfg():
                 num_warmup_steps=5000,
             ),
             metrics=MetricGroup(metric_dict=dict(
-                kld=MetricContainer(KLDivergenceSigmoid()),
+                kld=MetricContainer(KLDivergence()),
                 l1=MetricContainer(MeanAbsoluteError()),
             )),
         ),
