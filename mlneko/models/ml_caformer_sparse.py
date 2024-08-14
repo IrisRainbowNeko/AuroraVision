@@ -7,6 +7,7 @@ from rainbowneko.models.layers import GroupLinear
 import math
 from torch.utils.checkpoint import checkpoint
 from typing import Union, List
+import caformer_hook
 
 from .ms_decoder import MSDecoder, MSDecoderLayer
 from .position_encoding import build_position_encoding
@@ -48,15 +49,18 @@ class MLFormerSpares(nn.Module):
     def encode(self, x):
         x = self.encoder.stem(x)
         feat_list = []
+        loss_list = []
         for i, stage in enumerate(self.encoder.stages):
             if self.grad_checkpointing and not torch.jit.is_scripting():
-                x = checkpoint(stage, x)
+                x, x_loss = checkpoint(stage, x)
             else:
-                x = stage(x)
+                x, x_loss = stage(x)
+
+            loss_list.append(x_loss)
 
             if i >= self.scale_skip:
                 feat_list.append(x)
-        return feat_list
+        return feat_list, sum(loss_list)
 
     def decode(self, feat_list):
         q = repeat(self.query_embed.weight, 'q c -> b q c', b=feat_list[0].shape[0])
@@ -67,7 +71,7 @@ class MLFormerSpares(nn.Module):
         return out
 
     def forward(self, x):
-        feat_list = self.encode(x)
+        feat_list, feat_loss = self.encode(x)
         pred = self.decode(feat_list)  # [B, num_queries, C]
 
         pred = self.final_norm(pred)
@@ -81,7 +85,7 @@ class MLFormerSpares(nn.Module):
             pred = torch.cat([pred[:, self.part_num_queries_cum[i]:self.part_num_queries_cum[i+1], :].flatten(1,2)[:, :self.num_classes[i]]
                 for i in range(len(self.part_num_queries_cum)-1)], dim=-1)
         pred = pred.sigmoid()
-        return pred
+        return pred, feat_loss
 
 
 def build_mlformer(model_name, d_model=512, pretrained_encoder=True, dec_head_dim=32, dec_layers=6, encoder_ckpt=None,

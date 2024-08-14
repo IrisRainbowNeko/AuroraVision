@@ -56,12 +56,22 @@ def make_cfg():
             save_step=10000,
             gradient_accumulation_steps=4,
 
-            loss=LossContainer(_partial_=True, loss=AsymmetricKLLoss(
-                weight_file=[
-                    '/dataset/dzy/danbooru_2023/tags_danbooru_weight_v2_pos.npy',
-                    '/dataset/dzy/danbooru_2023/tags_danbooru_weight_v2_neg.npy',
-                ]
-            )),
+            # loss=LossContainer(_partial_=True, loss=AsymmetricKLLoss(
+            #     weight_file=[
+            #         '/dataset/dzy/danbooru_2023/tags_danbooru_weight_v2_pos.npy',
+            #         '/dataset/dzy/danbooru_2023/tags_danbooru_weight_v2_neg.npy',
+            #     ]
+            # )),
+
+            loss=LossGroup(partial_=True, loss_list=[
+                LossContainer(loss=AsymmetricKLLoss(
+                    weight_file=[
+                        '/dataset/dzy/danbooru_2023/tags_danbooru_weight_v2_pos.npy',
+                        '/dataset/dzy/danbooru_2023/tags_danbooru_weight_v2_neg.npy',
+                    ]
+                )),
+                LossContainer(loss=nn.Identity(), weight=0.1, key_map=('pred.feat_loss -> 0',)),
+            ]),
 
             # resume=dict(
             #     ckpt_path=['exps/mld_v2/ckpts/mld-L_danbooru-30000.ckpt'],
@@ -86,7 +96,8 @@ def make_cfg():
         model=dict(
             name='mld-L_danbooru',
             #wrapper=SingleWrapper(_partial_=True, model=mlformer_L(num_classes=num_classes), key_map={'pred':'0', 'pred_all':'1'})
-            wrapper=SingleWrapper(_partial_=True, model=mlformer_L(num_classes=num_classes, T=1., num_queries=200, ex_tokens=4))
+            wrapper=SingleWrapper(_partial_=True, model=mlformer_L(num_classes=num_classes, T=1., num_queries=200, ex_tokens=4),
+                                  key_map=('0 -> pred', '1 -> feat_loss'))
         ),
 
         data_train=dict(
