@@ -31,7 +31,7 @@ def make_cfg():
     dict(
         _base_=make_base(train_base, tuning_base)+[],
 
-        exp_dir=f'exps/mld_v1.1-2',
+        exp_dir=f'exps/mld_v1.1-3',
         mixed_precision='fp16',
         allow_tf32=True,
 
@@ -63,7 +63,7 @@ def make_cfg():
             # ]),
 
             resume=dict(
-                ckpt_path=['exps/mld_v1.1/ckpts/mld-L_danbooru-50000.ckpt'],
+                ckpt_path=['exps/mld_v1.1-2/ckpts/mld-L_danbooru-80000.ckpt'],
                 start_step=0,
             ),
 

@@ -2,6 +2,7 @@ import torch
 from einops import repeat, rearrange
 from timm.models import create_model
 from torch import nn
+import numpy as np
 from rainbowneko.models.layers import GroupLinear
 import math
 from torch.utils.checkpoint import checkpoint
@@ -24,7 +25,8 @@ class MLFormerSpares(nn.Module):
         if isinstance(num_classes, int):
             num_classes = [num_classes]
         pre_cls_num = math.ceil(sum(num_classes)/num_queries)
-        self.part_num_queries = [0]+[math.ceil(nc/pre_cls_num) for nc in num_classes]
+        self.part_num_queries = [math.ceil(nc/pre_cls_num) for nc in num_classes]
+        self.part_num_queries_cum = np.cumsum([0]+self.part_num_queries)
         num_queries = sum(self.part_num_queries) + ex_tokens
 
         self.cls_head = GroupLinear(d_model, pre_cls_num, group=num_queries)
@@ -58,7 +60,7 @@ class MLFormerSpares(nn.Module):
 
     def decode(self, feat_list):
         q = repeat(self.query_embed.weight, 'q c -> b q c', b=feat_list[0].shape[0])
-        pos_emb = [self.pos_encoder(rearrange(x, 'b c h w -> b h w c')).flatten(1,2) for x in feat_list]
+        pos_emb = [self.pos_encoder(rearrange(x, 'b c h w -> b h w c')).flatten(1,2).to(dtype=q.dtype) for x in feat_list]
         feat_list = [trans(rearrange(x, 'b c h w -> b (h w) c')) for x, trans in zip(feat_list, self.feats_trans)]
 
         out = self.decoder(q, feat_list, pos=pos_emb)
@@ -76,14 +78,14 @@ class MLFormerSpares(nn.Module):
         if len(self.num_classes)==1:
             pred = pred.flatten(1, 2)[:, :self.num_classes[0]]  # [B, num_classes]
         else:
-            pred = torch.cat([pred[:, self.part_num_queries[i]:self.part_num_queries[i+1], :].flatten(1,2)[:self.num_classes[i]]
-                for i in range(len(self.part_num_queries)-1)], dim=-1)
+            pred = torch.cat([pred[:, self.part_num_queries_cum[i]:self.part_num_queries_cum[i+1], :].flatten(1,2)[:, :self.num_classes[i]]
+                for i in range(len(self.part_num_queries_cum)-1)], dim=-1)
         pred = pred.sigmoid()
         return pred
 
 
 def build_mlformer(model_name, d_model=512, pretrained_encoder=True, dec_head_dim=32, dec_layers=6, encoder_ckpt=None,
-                   num_queries=50, num_classes=1000, scale_skip=1, T=4.):
+                   num_queries=50, num_classes=1000, scale_skip=1, **kwargs):
     encoder = create_model(model_name, pretrained=pretrained_encoder)
     del encoder.head
     dec_layer = lambda : MSDecoderLayer(d_model, head_dim=dec_head_dim)
@@ -93,18 +95,18 @@ def build_mlformer(model_name, d_model=512, pretrained_encoder=True, dec_head_di
         encoder.load_state_dict(torch.load(encoder_ckpt))
 
     model = MLFormerSpares(encoder, decoder, num_queries=num_queries, num_classes=num_classes,
-                     d_model=d_model, scale_skip=scale_skip, T=T)
+                     d_model=d_model, scale_skip=scale_skip, **kwargs)
 
     return model
 
-def mlformer_H(num_classes, scale_skip=2, num_queries=60, T=4.):
+def mlformer_H(num_classes, scale_skip=2, num_queries=60, **kwargs):
     return build_mlformer('caformer_b36.sail_in22k_ft_in1k_384', d_model=640, num_queries=num_queries, dec_layers=5,
-                          scale_skip=scale_skip, num_classes=num_classes, T=T)
+                          scale_skip=scale_skip, num_classes=num_classes, **kwargs)
 
-def mlformer_L(num_classes, scale_skip=2, num_queries=60, T=4.):
-    return build_mlformer('caformer_b36.sail_in22k_ft_in1k_384', d_model=640, num_queries=num_queries, dec_layers=3,
-                          scale_skip=scale_skip, num_classes=num_classes, T=T)
+def mlformer_L(num_classes, scale_skip=2, num_queries=60, **kwargs):
+    return build_mlformer('caformer_b36', d_model=640, num_queries=num_queries, dec_layers=3,
+                          scale_skip=scale_skip, num_classes=num_classes, **kwargs)
 
-def mlformer_M(num_classes, scale_skip=2, num_queries=60, T=4.):
+def mlformer_M(num_classes, scale_skip=2, num_queries=60, **kwargs):
     return build_mlformer('caformer_m36.sail_in22k_ft_in1k_384', d_model=512, num_queries=num_queries, dec_layers=5,
-                          scale_skip=scale_skip, num_classes=num_classes, T=T)
+                          scale_skip=scale_skip, num_classes=num_classes, **kwargs)

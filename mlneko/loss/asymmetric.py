@@ -16,7 +16,7 @@ class AsymmetricLoss(nn.Module):
         self.eps = eps
 
         if weight_file:
-            self.cls_weight = torch.tensor(np.load(weight_file))
+            self.cls_weight = [torch.tensor(np.load(weight_file[0])), torch.tensor(np.load(weight_file[1]))]
         else:
             self.cls_weight = None
 
@@ -59,9 +59,11 @@ class AsymmetricLoss(nn.Module):
             loss *= one_sided_w
 
         if self.cls_weight is not None:
-            self.cls_weight = self.cls_weight.to(x.device)
-            cls_weight_pos = y*self.cls_weight.log()
-            cls_weight_neg = (1-y)*(1/self.cls_weight).log()
+            self.cls_weight[0] = self.cls_weight[0].to(x.device) # pos
+            self.cls_weight[1] = self.cls_weight[1].to(x.device) # neg
+
+            cls_weight_pos = y*self.cls_weight[0].log()
+            cls_weight_neg = (1-y)*self.cls_weight[1].log()
             loss = loss * (cls_weight_pos+cls_weight_neg).exp()
 
         return -loss.sum()/B
@@ -78,7 +80,7 @@ class AsymmetricKLLoss(nn.Module):
         self.eps = eps
 
         if weight_file:
-            self.cls_weight = torch.tensor(np.load(weight_file))
+            self.cls_weight = [torch.tensor(np.load(weight_file[0])), torch.tensor(np.load(weight_file[1]))]
         else:
             self.cls_weight = None
 
@@ -93,6 +95,9 @@ class AsymmetricKLLoss(nn.Module):
         B = x.shape[0]
         # Calculating Probabilities
         #x_sigmoid = torch.sigmoid(x)
+        nan_mask = torch.isnan(x)
+        if nan_mask.any():
+            print(torch.where(nan_mask))
         x_sigmoid = x
         xs_pos = x_sigmoid
         xs_neg = 1 - x_sigmoid
@@ -121,10 +126,16 @@ class AsymmetricKLLoss(nn.Module):
             loss *= one_sided_w
 
         if self.cls_weight is not None:
-            self.cls_weight = self.cls_weight.to(x.device)
-            cls_weight_pos = y*self.cls_weight.log()
-            cls_weight_neg = (1-y)*(1/self.cls_weight).log()
+            self.cls_weight[0] = self.cls_weight[0].to(x.device) # pos
+            self.cls_weight[1] = self.cls_weight[1].to(x.device) # neg
+
+            cls_weight_pos = y*self.cls_weight[0].log()
+            cls_weight_neg = (1-y)*self.cls_weight[1].log()
             loss = loss * (cls_weight_pos+cls_weight_neg).exp()
+
+        # 将NaN值替换为0
+        nan_mask = torch.isnan(loss)
+        loss[nan_mask] = 0.
 
         return loss.sum()/B
 

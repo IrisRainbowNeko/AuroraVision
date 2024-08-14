@@ -13,7 +13,7 @@ class LmdbDanbooruSource(ImageLabelSource):
         super(LmdbDanbooruSource, self).__init__(img_root, label_file, image_transforms=image_transforms, bg_color=bg_color,
                                                repeat=repeat)
 
-        self.env = lmdb.open(img_root, readonly=True, max_readers=512)
+        self.env = lmdb.open(img_root, readonly=True, max_readers=2048)
         self.num_classes = num_classes
 
     def load_image(self, img_id: int) -> Dict[str, Any]:
