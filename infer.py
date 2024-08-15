@@ -12,7 +12,7 @@ class Infer:
         manager = CkptManagerPKL(saved_model=(
             {'model': '', 'trainable': False},
         ))
-        #manager.load_ckpt_to_model(self.model, ckpt_path)
+        manager.load_ckpt_to_model(self.model, ckpt_path)
         self.model = self.model.to(device)
         self.device = device
 
@@ -33,23 +33,25 @@ class Infer:
     def infer_one(self, path, thr=0.5):
         img = self.load_image(path)
 
-        analyzer = ModelIOAnalyzer(self.model)
-        with torch.cuda.amp.autocast():
-            info = analyzer.analyze(img)
-        FlowViser().show(self.model, info)
+        # analyzer = ModelIOAnalyzer(self.model)
+        # with torch.cuda.amp.autocast():
+        #     info = analyzer.analyze(img)
+        # FlowViser().show(self.model, info)
 
         with torch.cuda.amp.autocast():
-            pred = self.model(img)
+            pred, feat_loss = self.model(img)
 
         pred = pred.cpu().view(-1)
-        print(pred)
+        print(feat_loss)
         pred_tags = [(self.tags[i], x.item()) for i,x in enumerate(pred.view(-1)) if x > thr]
         return pred_tags
 
 if __name__ == '__main__':
-    infer = Infer('exps/mld_v2.1/ckpts/mld-L_danbooru-10000.ckpt', '/dataset/dzy/danbooru_2023/tags_danbooru_map_v2.csv', num_classes=[8092, 2751])
+    infer = Infer('exps/mld_v2.1/ckpts/mld-L_danbooru-150000.ckpt', '/dataset/dzy/danbooru_2023/tags_danbooru_map_v2.csv', num_classes=[8092, 2751])
+    #infer = Infer('exps/mld_v2.1-cb/ckpts/mld-L_danbooru-30000.ckpt', '/dataset/dzy/danbooru_2023/tags_danbooru_map_v2.csv', num_classes=[8092, 2751])
     #infer = Infer('exps/mld_v1.1-3/ckpts/mld-L_danbooru-220000.ckpt', '/dataset/dzy/danbooru_2023/tags_danbooru_map.csv')
-    pred_tags = infer.infer_one('imgs/00001-0-standing.png')
+    #pred_tags = infer.infer_one('imgs/00001-0-standing.png')
+    pred_tags = infer.infer_one('imgs/2.jpg')
     pred_tags = sorted(pred_tags, key=lambda x: x[1], reverse = True)
     for tag, prob in pred_tags:
         print(tag, prob)

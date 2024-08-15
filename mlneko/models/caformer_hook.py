@@ -15,17 +15,21 @@ def stage_forward_hook(self: MetaFormerStage, x: Tensor):
         if self.grad_checkpointing and not torch.jit.is_scripting():
             for block in self.blocks:
                 x = checkpoint(block, x)
-                loss = F.relu(x.abs() - 100).mean()*0.01
+                loss = F.relu(x.abs() - 100)
+                loss = torch.nan_to_num(loss, nan=0.0, posinf=0.0, neginf=0.0)
+                loss = loss.mean()/len(self.blocks)
                 x_loss_list.append(loss)
         else:
             for block in self.blocks:
                 x = block(x)
-                loss = F.relu(x.abs() - 100).mean()*0.01
+                loss = F.relu(x.abs() - 100)
+                loss = torch.nan_to_num(loss, nan=0.0, posinf=0.0, neginf=0.0)
+                loss = loss.mean()/len(self.blocks)
                 x_loss_list.append(loss)
 
         if not self.use_nchw:
             x = x.transpose(1, 2).reshape(B, C, H, W)
 
-        return x, sum(x_loss_list)/len(x_loss_list)
+        return x, sum(x_loss_list)
 
 MetaFormerStage.forward = stage_forward_hook

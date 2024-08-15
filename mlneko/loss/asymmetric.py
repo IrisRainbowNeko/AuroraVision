@@ -69,7 +69,7 @@ class AsymmetricLoss(nn.Module):
         return -loss.sum()/B
 
 class AsymmetricKLLoss(nn.Module):
-    def __init__(self, gamma_neg=4, gamma_pos=1, w1=0.5, weight_file=None, clip=0.05, eps=1e-6, focal_no_grad=False):
+    def __init__(self, gamma_neg=4, gamma_pos=1, w1=0.0, weight_file=None, clip=0.05, eps=1e-6, focal_no_grad=False):
         super().__init__()
 
         self.gamma_neg = gamma_neg
@@ -95,9 +95,6 @@ class AsymmetricKLLoss(nn.Module):
         B = x.shape[0]
         # Calculating Probabilities
         #x_sigmoid = torch.sigmoid(x)
-        nan_mask = torch.isnan(x)
-        if nan_mask.any():
-            print(torch.where(nan_mask))
         x_sigmoid = x
         xs_pos = x_sigmoid
         xs_neg = 1 - x_sigmoid
@@ -132,10 +129,6 @@ class AsymmetricKLLoss(nn.Module):
             cls_weight_pos = y*self.cls_weight[0].log()
             cls_weight_neg = (1-y)*self.cls_weight[1].log()
             loss = loss * (cls_weight_pos+cls_weight_neg).exp()
-
-        # 将NaN值替换为0
-        nan_mask = torch.isnan(loss)
-        loss[nan_mask] = 0.
 
         return loss.sum()/B
 

@@ -7,7 +7,7 @@ from rainbowneko.models.layers import GroupLinear
 import math
 from torch.utils.checkpoint import checkpoint
 from typing import Union, List
-import caformer_hook
+from . import caformer_hook
 
 from .ms_decoder import MSDecoder, MSDecoderLayer
 from .position_encoding import build_position_encoding
@@ -19,6 +19,9 @@ class MLFormerSpares(nn.Module):
         super().__init__()
         self.encoder = encoder
         self.decoder = decoder
+
+        for stage in self.encoder.stages:
+            stage.set_grad_checkpointing(grad_checkpointing)
 
         self.final_norm = RMSNorm(d_model)
 
@@ -44,7 +47,7 @@ class MLFormerSpares(nn.Module):
         self.d_model = d_model
         self.scale_skip = scale_skip
         self.T = T
-        self.grad_checkpointing = grad_checkpointing
+        self.grad_checkpointing = False
 
     def encode(self, x):
         x = self.encoder.stem(x)
@@ -85,7 +88,7 @@ class MLFormerSpares(nn.Module):
             pred = torch.cat([pred[:, self.part_num_queries_cum[i]:self.part_num_queries_cum[i+1], :].flatten(1,2)[:, :self.num_classes[i]]
                 for i in range(len(self.part_num_queries_cum)-1)], dim=-1)
         pred = pred.sigmoid()
-        return pred, feat_loss
+        return pred, feat_loss.unsqueeze(0)
 
 
 def build_mlformer(model_name, d_model=512, pretrained_encoder=True, dec_head_dim=32, dec_layers=6, encoder_ckpt=None,
@@ -108,7 +111,7 @@ def mlformer_H(num_classes, scale_skip=2, num_queries=60, **kwargs):
                           scale_skip=scale_skip, num_classes=num_classes, **kwargs)
 
 def mlformer_L(num_classes, scale_skip=2, num_queries=60, **kwargs):
-    return build_mlformer('caformer_b36', d_model=640, num_queries=num_queries, dec_layers=3,
+    return build_mlformer('caformer_b36.sail_in22k_ft_in1k_384', d_model=640, num_queries=num_queries, dec_layers=3,
                           scale_skip=scale_skip, num_classes=num_classes, **kwargs)
 
 def mlformer_M(num_classes, scale_skip=2, num_queries=60, **kwargs):

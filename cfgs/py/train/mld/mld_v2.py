@@ -54,7 +54,7 @@ def make_cfg():
             workers=4,
             max_grad_norm=1.0,
             save_step=10000,
-            gradient_accumulation_steps=4,
+            gradient_accumulation_steps=2,
 
             # loss=LossContainer(_partial_=True, loss=AsymmetricKLLoss(
             #     weight_file=[
@@ -63,7 +63,7 @@ def make_cfg():
             #     ]
             # )),
 
-            loss=LossGroup(partial_=True, loss_list=[
+            loss=LossGroup(_partial_=True, loss_list=[
                 LossContainer(loss=AsymmetricKLLoss(
                     weight_file=[
                         '/dataset/dzy/danbooru_2023/tags_danbooru_weight_v2_pos.npy',
@@ -85,7 +85,7 @@ def make_cfg():
             scale_lr=False,
             scheduler=dict(
                 name='cosine',
-                num_warmup_steps=5000,
+                num_warmup_steps=1000,
             ),
             metrics=MetricGroup(metric_dict=dict(
                 msle=MetricContainer(MeanSquaredLogError()),
@@ -101,7 +101,7 @@ def make_cfg():
         ),
 
         data_train=dict(
-            dataset1=ImageLabelDataset(_partial_=True, batch_size=24, loss_weight=1.0,
+            dataset1=ImageLabelDataset(_partial_=True, batch_size=64, loss_weight=1.0,
                 source=dict(
                     data_source1=LmdbDanbooruSource(
                         img_root="/home/dongziyi/dataset/danbooru_2023_lmdb",
@@ -120,7 +120,7 @@ def make_cfg():
                 bucket=RatioBucket.from_files(
                     target_area=448*448,
                     num_bucket=16,
-                    pre_build_bucket='/dataset/dzy/danbooru_2023/bucket-448,448-train-v2-24.pkl',
+                    pre_build_bucket='/dataset/dzy/danbooru_2023/bucket-448,448-train-v2-64.pkl',
                 ),
             )
         ),
@@ -137,7 +137,7 @@ def make_cfg():
                 f1=MetricContainer(MultilabelF1Score(num_labels=num_classes_all)),
             )),
             dataset=dict(
-                dataset1=partial(ImageLabelDataset, batch_size=24, loss_weight=1.0,
+                dataset1=partial(ImageLabelDataset, batch_size=64, loss_weight=1.0,
                     source=dict(
                         data_source1=LmdbDanbooruSource(
                             img_root="/home/dongziyi/dataset/danbooru_2023_lmdb",
@@ -152,7 +152,7 @@ def make_cfg():
                     bucket=RatioBucket.from_files(
                         target_area=448*448,
                         num_bucket=16,
-                        pre_build_bucket='/dataset/dzy/danbooru_2023/bucket-448,448-test-v2-24.pkl',
+                        pre_build_bucket='/dataset/dzy/danbooru_2023/bucket-448,448-test-v2-64.pkl',
                     ),
                 )
             )
