@@ -9,6 +9,10 @@ AuroraVision是一个通用的二次元感知模型。可以对二次元图片�
 pip install -r requirements.txt
 ```
 
+## 预训练模型
+
+https://huggingface.co/7eu7d7/AuroraVision
+
 ## 使用
 
 ### 图像打标签
