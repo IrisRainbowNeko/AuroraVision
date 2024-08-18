@@ -237,11 +237,12 @@ print('len', len(content_tags), len(raw_tags))
 print(','.join(content_tags))
 print(','.join(raw_tags))
 
-with open(r'E:\dataset\tagger\tags_danbooru_prune_v2.csv', 'w', encoding='utf-8') as f:
+# 加_是因为有4个tag在我的数据库里没有，手动删了
+with open(r'E:\dataset\tagger\tags_danbooru_prune_v2_.csv', 'w', encoding='utf-8') as f:
     f.write('\n'.join(list(dict.fromkeys(content_tags))))
 
 tags_mapper = [f'{raw_tag} -> {tag}' for tag, raw_tag in zip(content_tags, raw_tags)]
 
 # 输出筛选后的标签
-with open(r'E:\dataset\tagger\tags_danbooru_map_v2.csv', 'w', encoding='utf-8') as f:
+with open(r'E:\dataset\tagger\tags_danbooru_map_v2_.csv', 'w', encoding='utf-8') as f:
     f.write('\n'.join(tags_mapper))

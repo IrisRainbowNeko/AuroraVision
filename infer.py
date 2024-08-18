@@ -1,14 +1,18 @@
+import os.path
+
 import torch
 from rainbowneko.ckpt_manager import CkptManagerPKL
 from mlneko.models.ml_caformer_sparse import mlformer_L
 import torchvision
 from PIL import Image
 
-from torchanalyzer import ModelIOAnalyzer, FlowViser
+# from torchanalyzer import ModelIOAnalyzer, FlowViser
+
+types_support = ('bmp', 'gif', 'ico', 'jpeg', 'jpg', 'png', 'tiff', 'webp')
 
 class Infer:
     def __init__(self, ckpt_path, tags_path, num_classes=6554, device='cuda'):
-        self.model = mlformer_L(num_classes=num_classes, T=1., num_queries=200, ex_tokens=4)
+        self.model = mlformer_L(num_classes=num_classes, T=1., num_queries=200, ex_tokens=4, grad_checkpointing=False)
         manager = CkptManagerPKL(saved_model=(
             {'model': '', 'trainable': False},
         ))
@@ -42,16 +46,26 @@ class Infer:
             pred, feat_loss = self.model(img)
 
         pred = pred.cpu().view(-1)
-        print(feat_loss)
         pred_tags = [(self.tags[i], x.item()) for i,x in enumerate(pred.view(-1)) if x > thr]
+        pred_tags = sorted(pred_tags, key=lambda x: x[1], reverse=True)
         return pred_tags
+
+    def infer(self, path, thr=0.5):
+        if os.path.isdir(path):
+            pred_dict = {}
+            for root, dirs, files in os.walk(path):
+                for file in files:
+                    if file.endswith(types_support):
+                        pred_tags = self.infer_one(os.path.join(root, file), thr)
+                        pred_dict[file] = pred_tags
+            return pred_dict
+        else:
+            pred_tags = self.infer_one(path, thr)
+            return pred_tags
 
 if __name__ == '__main__':
     infer = Infer('exps/mld_v2.1/ckpts/mld-L_danbooru-150000.ckpt', '/dataset/dzy/danbooru_2023/tags_danbooru_map_v2.csv', num_classes=[8092, 2751])
-    #infer = Infer('exps/mld_v2.1-cb/ckpts/mld-L_danbooru-30000.ckpt', '/dataset/dzy/danbooru_2023/tags_danbooru_map_v2.csv', num_classes=[8092, 2751])
-    #infer = Infer('exps/mld_v1.1-3/ckpts/mld-L_danbooru-220000.ckpt', '/dataset/dzy/danbooru_2023/tags_danbooru_map.csv')
     #pred_tags = infer.infer_one('imgs/00001-0-standing.png')
-    pred_tags = infer.infer_one('imgs/2.jpg')
-    pred_tags = sorted(pred_tags, key=lambda x: x[1], reverse = True)
+    pred_tags = infer.infer('imgs/2.jpg')
     for tag, prob in pred_tags:
         print(tag, prob)

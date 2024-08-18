@@ -1,14 +1,13 @@
 import csv
 import numpy as np
 import torch
-from torch.utils.data.sampler import WeightedRandomSampler
 
 count_path = r'E:\dataset\tagger\tags_count_danbooru_2023.csv'
 tag_map_path = r'E:\dataset\tagger\tags_danbooru_map_v2.csv'
 
-out_path_pos = r'E:\dataset\tagger\tags_danbooru_weight_v2.1-cb_pos.npy'
-out_path_neg = r'E:\dataset\tagger\tags_danbooru_weight_v2.1-cb_neg.npy'
-out_path_txt = r'E:\dataset\tagger\tags_danbooru_weight_v2.1-cb.txt'
+out_path_pos = r'E:\dataset\tagger\tags_danbooru_weight_v2.2-cb_pos.npy'
+out_path_neg = r'E:\dataset\tagger\tags_danbooru_weight_v2.2-cb_neg.npy'
+out_path_txt = r'E:\dataset\tagger\tags_danbooru_weight_v2.2-cb.txt'
 
 tag2id = {}
 
@@ -48,7 +47,7 @@ def log_inv():
 
 
 def blanace_loss(b=0.999):
-    weight = (1 - b) / (1 - b ** (counts / 100))
+    weight = (1 - b) / (1 - b ** (counts / 10))
     weight_mid = np.sqrt(weight[0] * weight[-1])
     weight = weight / weight_mid
     #weight = weight ** 0.7
