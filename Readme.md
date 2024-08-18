@@ -3,6 +3,8 @@
 AuroraVision是一个通用的二次元感知模型。可以对二次元图片进行标注，特征提取，相似度计算(图文，图图)等操作。
 后续还会提供目标检测相关功能。
 
+模型结构与[ML-Danbooru](https://github.com/IrisRainbowNeko/ML-Danbooru)类似
+
 ## 安装
 
 ```shell
