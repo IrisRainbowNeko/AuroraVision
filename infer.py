@@ -4,6 +4,7 @@ import os.path
 import torch
 import torchvision
 from PIL import Image
+from tqdm.auto import tqdm
 from rainbowneko.ckpt_manager import CkptManagerPKL
 
 from mlneko.models.ml_caformer_sparse import mlformer_L
@@ -15,7 +16,7 @@ types_support = ('bmp', 'gif', 'ico', 'jpeg', 'jpg', 'png', 'tiff', 'webp')
 class Infer:
     def __init__(self, ckpt_path, tags_path, num_classes=6554, device='cuda'):
         self.model = mlformer_L(num_classes=num_classes, T=1., num_queries=200, ex_tokens=4, grad_checkpointing=False)
-        manager = CkptManagerPKL(saved_model=({'model': '', 'trainable': False}))
+        manager = CkptManagerPKL(saved_model=({'model': '', 'trainable': False},))
         manager.load_ckpt_to_model(self.model, ckpt_path)
         self.model = self.model.to(device)
         self.device = device
@@ -58,11 +59,15 @@ class Infer:
     def infer(self, path, thr=0.5):
         if os.path.isdir(path):
             pred_dict = {}
+            file_list = []
             for root, dirs, files in os.walk(path):
                 for file in files:
                     if file.endswith(types_support):
-                        pred_tags = self.infer_one(os.path.join(root, file), thr)
-                        pred_dict[file] = pred_tags
+                        file_list.append(os.path.join(root, file))
+
+            for path in tqdm(file_list):
+                pred_tags = self.infer_one(path, thr)
+                pred_dict[path] = pred_tags
             return pred_dict
         else:
             pred_tags = self.infer_one(path, thr)
