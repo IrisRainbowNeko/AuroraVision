@@ -1,10 +1,12 @@
+import argparse
 import os.path
 
 import torch
-from rainbowneko.ckpt_manager import CkptManagerPKL
-from mlneko.models.ml_caformer_sparse import mlformer_L
 import torchvision
 from PIL import Image
+from rainbowneko.ckpt_manager import CkptManagerPKL
+
+from mlneko.models.ml_caformer_sparse import mlformer_L
 
 # from torchanalyzer import ModelIOAnalyzer, FlowViser
 
@@ -13,9 +15,7 @@ types_support = ('bmp', 'gif', 'ico', 'jpeg', 'jpg', 'png', 'tiff', 'webp')
 class Infer:
     def __init__(self, ckpt_path, tags_path, num_classes=6554, device='cuda'):
         self.model = mlformer_L(num_classes=num_classes, T=1., num_queries=200, ex_tokens=4, grad_checkpointing=False)
-        manager = CkptManagerPKL(saved_model=(
-            {'model': '', 'trainable': False},
-        ))
+        manager = CkptManagerPKL(saved_model=({'model': '', 'trainable': False}))
         manager.load_ckpt_to_model(self.model, ckpt_path)
         self.model = self.model.to(device)
         self.device = device
@@ -28,8 +28,13 @@ class Infer:
         with open(tags_path, encoding='utf8') as f:
             self.tags = [x.split(' -> ')[0] for x in f.read().split('\n')]
 
-    def load_image(self, path):
+    def load_image(self, path, target_size=448):
         img = Image.open(path)
+        w,h = img.size
+        #ratio = math.sqrt(target_size/(w*h))
+        ratio = target_size/min(w,h)
+        img = img.resize((int(w*ratio), int(h*ratio)), Image.LANCZOS)
+
         img = self.trans(img)
         return img.unsqueeze(0).to(self.device)
 
@@ -64,8 +69,14 @@ class Infer:
             return pred_tags
 
 if __name__ == '__main__':
-    infer = Infer('exps/mld_v2.1/ckpts/mld-L_danbooru-150000.ckpt', '/dataset/dzy/danbooru_2023/tags_danbooru_map_v2.csv', num_classes=[8092, 2751])
-    #pred_tags = infer.infer_one('imgs/00001-0-standing.png')
-    pred_tags = infer.infer('imgs/2.jpg')
+    parser = argparse.ArgumentParser(description="anime tagger")
+    parser.add_argument("--ckpt_path", type=str, default='')
+    parser.add_argument("--tags_path", type=str, default='tags_danbooru_v2.csv')
+    parser.add_argument('--num_classes', nargs='+', type=int, default=[8092, 2751])
+    parser.add_argument('--img', type=str, default='')
+    args = parser.parse_args()
+
+    infer = Infer(args.ckpt_path, args.tags_path, num_classes=args.num_classes)
+    pred_tags = infer.infer(args.img)
     for tag, prob in pred_tags:
         print(tag, prob)

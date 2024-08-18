@@ -1,12 +1,13 @@
-import torch
-from rainbowneko.train.data import ImageLabelDataset
-from rainbowneko.train.data.source import ImageLabelSource
-from typing import Dict, Any, Tuple
-from PIL import Image
-import lmdb
-import struct
-import io
 import csv
+import io
+import struct
+from typing import Dict, Any, Tuple
+
+import lmdb
+import torch
+from PIL import Image
+from rainbowneko.train.data.source import ImageLabelSource
+
 
 class LmdbDanbooruSource(ImageLabelSource):
     def __init__(self, img_root, label_file, num_classes=6554, image_transforms=None, bg_color=(255, 255, 255), repeat=1, **kwargs):
